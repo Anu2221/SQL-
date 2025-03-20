@@ -17,18 +17,54 @@ CREATE TABLE Employee (
     FOREIGN KEY (EmpDeptID) REFERENCES Department(DeptID)
 );
 
--- Insert data
+-- Create a log table for tracking changes
+CREATE TABLE EmployeeLog (
+    LogID INT PRIMARY KEY AUTO_INCREMENT,
+    EmpID INT,
+    ActionType VARCHAR(50),
+    ActionTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add indexes for faster lookup
+CREATE INDEX idx_EmpDeptID ON Employee(EmpDeptID);
+CREATE INDEX idx_DeptName ON Department(DeptName);
+
+-- Insert data with transaction to ensure data integrity
+START TRANSACTION;
 INSERT INTO Department (DeptName) VALUES ('Engineering');
 INSERT INTO Department (DeptName) VALUES ('Sales');
+COMMIT;
 
-INSERT INTO Employee (EmpName, EmpDeptID) VALUES ('John Doe', 1)   ;
-INSERT INTO Employee (EmpName, EmpDeptID) VALUES ('Jane Smith', 2);
+-- Stored Procedure to add employees
+DELIMITER $$
+CREATE PROCEDURE AddEmployee(IN empName VARCHAR(100), IN empDeptID INT)
+BEGIN
+    INSERT INTO Employee (EmpName, EmpDeptID) VALUES (empName, empDeptID);
+END $$
+DELIMITER ;
 
--- Select data from database
-SELECT * FROM Department;
-SELECT * FROM Employee;
+-- Use stored procedure to insert employees
+CALL AddEmployee('John Doe', 1);
+CALL AddEmployee('Jane Smith', 2);
 
--- Perform an inner join to combine data from two tables
-SELECT Employee.EmpID, Employee.EmpName, Department.DeptName
-FROM Employee
-JOIN Department ON Employee.EmpDeptID = Department.DeptID;
+-- Create a view to simplify employee reporting
+CREATE VIEW EmployeeDetails AS
+SELECT E.EmpID, E.EmpName, D.DeptName
+FROM Employee E
+JOIN Department D ON E.EmpDeptID = D.DeptID;
+
+-- Trigger to log employee additions
+DELIMITER $$
+CREATE TRIGGER AfterEmployeeInsert
+AFTER INSERT ON Employee
+FOR EACH ROW
+BEGIN
+    INSERT INTO EmployeeLog (EmpID, ActionType) VALUES (NEW.EmpID, 'INSERT');
+END $$
+DELIMITER ;
+
+-- Query to view employee details
+SELECT * FROM EmployeeDetails;
+
+-- Check employee logs
+SELECT * FROM EmployeeLog;
